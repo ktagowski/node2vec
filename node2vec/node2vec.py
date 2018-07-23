@@ -15,57 +15,55 @@ def parallel_generate_walks(d_graph, global_walk_length, num_walks, cpu_num, sam
     """
 
     walks = list()
-    with tqdm(total=num_walks) as pbar:
-        pbar.set_description('Generating walks (CPU: {})'.format(cpu_num))
+    
+    for n_walk in range(num_walks):
 
-        for n_walk in range(num_walks):
+        # Update progress bar
+        pbar.update(1)
 
-            # Update progress bar
-            pbar.update(1)
+        # Shuffle the nodes
+        shuffled_nodes = list(d_graph.keys())
+        random.shuffle(shuffled_nodes)
 
-            # Shuffle the nodes
-            shuffled_nodes = list(d_graph.keys())
-            random.shuffle(shuffled_nodes)
+        # Start a random walk from every node
+        for source in shuffled_nodes:
 
-            # Start a random walk from every node
-            for source in shuffled_nodes:
+            # Skip nodes with specific num_walks
+            if source in sampling_strategy and \
+                    num_walks_key in sampling_strategy[source] and \
+                    sampling_strategy[source][num_walks_key] <= n_walk:
+                continue
 
-                # Skip nodes with specific num_walks
-                if source in sampling_strategy and \
-                        num_walks_key in sampling_strategy[source] and \
-                        sampling_strategy[source][num_walks_key] <= n_walk:
-                    continue
+            # Start walk
+            walk = [source]
 
-                # Start walk
-                walk = [source]
+            # Calculate walk length
+            if source in sampling_strategy:
+                walk_length = sampling_strategy[source].get(walk_length_key, global_walk_length)
+            else:
+                walk_length = global_walk_length
 
-                # Calculate walk length
-                if source in sampling_strategy:
-                    walk_length = sampling_strategy[source].get(walk_length_key, global_walk_length)
+            # Perform walk
+            while len(walk) < walk_length:
+
+                walk_options = d_graph[walk[-1]].get(neighbors_key, None)
+
+                # Skip dead end nodes
+                if not walk_options:
+                    break
+
+                if len(walk) == 1:  # For the first step
+                    probabilities = d_graph[walk[-1]][first_travel_key]
+                    walk_to = np.random.choice(walk_options, size=1, p=probabilities)[0]
                 else:
-                    walk_length = global_walk_length
+                    probabilities = d_graph[walk[-1]][probabilities_key][walk[-2]]
+                    walk_to = np.random.choice(walk_options, size=1, p=probabilities)[0]
 
-                # Perform walk
-                while len(walk) < walk_length:
+                walk.append(walk_to)
 
-                    walk_options = d_graph[walk[-1]].get(neighbors_key, None)
+            walk = list(map(str, walk))  # Convert all to strings
 
-                    # Skip dead end nodes
-                    if not walk_options:
-                        break
-
-                    if len(walk) == 1:  # For the first step
-                        probabilities = d_graph[walk[-1]][first_travel_key]
-                        walk_to = np.random.choice(walk_options, size=1, p=probabilities)[0]
-                    else:
-                        probabilities = d_graph[walk[-1]][probabilities_key][walk[-2]]
-                        walk_to = np.random.choice(walk_options, size=1, p=probabilities)[0]
-
-                    walk.append(walk_to)
-
-                walk = list(map(str, walk))  # Convert all to strings
-
-                walks.append(walk)
+            walks.append(walk)
 
     return walks
 
@@ -127,7 +125,7 @@ class Node2Vec:
         d_graph = defaultdict(dict)
         first_travel_done = set()
 
-        for source in tqdm(self.graph.nodes(), desc='Computing transition probabilities'):
+        for source in self.graph.nodes():
 
             # Init probabilities dict for first travel
             if self.PROBABILITIES_KEY not in d_graph[source]:
