@@ -18,9 +18,6 @@ def parallel_generate_walks(d_graph, global_walk_length, num_walks, cpu_num, sam
     
     for n_walk in range(num_walks):
 
-        # Update progress bar
-        pbar.update(1)
-
         # Shuffle the nodes
         shuffled_nodes = list(d_graph.keys())
         random.shuffle(shuffled_nodes)
